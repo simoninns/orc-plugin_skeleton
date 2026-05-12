@@ -1,3 +1,11 @@
+/*
+ * File:        plugin.cpp
+ * Module:      orc-stage-plugin-skeleton-passthrough
+ * Purpose:     Runtime plugin bundle for SkeletonPassthroughStage
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-FileCopyrightText: 2026 <Your Name>
+ */
+
 #include "plugin.h"
 #include "skeleton_passthrough_stage.h"
 
@@ -31,8 +39,7 @@ ORC_STAGE_PLUGIN_EXPORT bool orc_register_stage_plugin(
     }
 
     const auto node_type_info = create_stage()->get_node_type_info();
-    if (node_type_info.stage_name != orc::plugins::skeleton::kStageName ||
-        node_type_info.display_name != orc::plugins::skeleton::kStageDisplayName ||
+    if (node_type_info.display_name != orc::plugins::skeleton::kStageDisplayName ||
         node_type_info.menu_category != orc::plugins::skeleton::kStageMenuCategory ||
         node_type_info.type != orc::plugins::skeleton::kStageNodeType ||
         node_type_info.min_inputs != orc::plugins::skeleton::kStageMinInputs ||

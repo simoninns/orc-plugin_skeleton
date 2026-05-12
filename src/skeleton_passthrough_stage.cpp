@@ -1,225 +1,114 @@
+/*
+ * File:        skeleton_passthrough_stage.cpp
+ * Module:      orc-stage-plugin-skeleton-passthrough
+ * Purpose:     Passthrough stage that forwards one input artifact unchanged
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-FileCopyrightText: 2026 <Your Name>
+ */
+
 #include "skeleton_passthrough_stage.h"
 
-#include <algorithm>
+// Use the optimised rendering pipeline from orc-core when building in-tree.
+// When building against an installed/distributed SDK this header is not
+// available, so the portable fallback implementation below is used instead.
+#if __has_include(<preview_helpers.h>)
+#  include <preview_helpers.h>
+#  define ORC_SKELETON_HAS_PREVIEW_HELPERS 1
+#else
+#  include <algorithm>
+#endif
 
 namespace orc::plugins::skeleton {
 
 namespace {
 
-enum class PreviewChannel {
-    Composite,
-    Luma,
-    Chroma,
-    CompositeYC,
-};
-
-struct ParsedPreviewOption {
-    std::string base_option_id;
-    PreviewChannel channel;
-};
-
-ParsedPreviewOption parse_preview_option_id(const std::string& option_id)
-{
-    ParsedPreviewOption parsed{option_id, PreviewChannel::Composite};
-
-    if (option_id.find("_yc") != std::string::npos) {
-        parsed.channel = PreviewChannel::CompositeYC;
-        const auto pos = option_id.find("_yc");
-        parsed.base_option_id = option_id.substr(0, pos);
-        if (pos + 3 < option_id.size() && option_id.substr(pos + 3) == "_raw") {
-            parsed.base_option_id += "_raw";
-        }
-        return parsed;
-    }
-
-    if (option_id.find("_y") != std::string::npos) {
-        parsed.channel = PreviewChannel::Luma;
-        const auto pos = option_id.find("_y");
-        parsed.base_option_id = option_id.substr(0, pos);
-        if (pos + 2 < option_id.size() && option_id.substr(pos + 2) == "_raw") {
-            parsed.base_option_id += "_raw";
-        }
-        return parsed;
-    }
-
-    if (option_id.find("_c") != std::string::npos) {
-        parsed.channel = PreviewChannel::Chroma;
-        const auto pos = option_id.find("_c");
-        parsed.base_option_id = option_id.substr(0, pos);
-        if (pos + 2 < option_id.size() && option_id.substr(pos + 2) == "_raw") {
-            parsed.base_option_id += "_raw";
-        }
-        return parsed;
-    }
-
-    return parsed;
-}
-
-const VideoFieldRepresentation::sample_type* get_channel_line(
-    const VideoFieldRepresentation* representation,
-    FieldID field_id,
-    uint32_t line_index,
-    PreviewChannel channel)
-{
-    if (!representation) {
-        return nullptr;
-    }
-
-    if (!representation->has_separate_channels()) {
-        return representation->get_line(field_id, line_index);
-    }
-
-    if (channel == PreviewChannel::Chroma) {
-        const auto* chroma = representation->get_line_chroma(field_id, line_index);
-        if (chroma) {
-            return chroma;
-        }
-        return representation->get_line(field_id, line_index);
-    }
-
-    const auto* luma = representation->get_line_luma(field_id, line_index);
-    if (luma) {
-        return luma;
-    }
-    return representation->get_line(field_id, line_index);
-}
-
-uint16_t sample_for_channel(
-    const VideoFieldRepresentation* representation,
-    FieldID field_id,
-    uint32_t line_index,
-    uint32_t x,
-    PreviewChannel channel)
-{
-    const auto* primary = get_channel_line(representation, field_id, line_index, channel);
-    if (!primary) {
-        return 0;
-    }
-
-    if (channel == PreviewChannel::CompositeYC && representation && representation->has_separate_channels()) {
-        const auto* luma = representation->get_line_luma(field_id, line_index);
-        const auto* chroma = representation->get_line_chroma(field_id, line_index);
-        if (luma && chroma) {
-            return static_cast<uint16_t>((static_cast<uint32_t>(luma[x]) + static_cast<uint32_t>(chroma[x])) / 2);
-        }
-    }
-
-    return primary[x];
-}
+#ifndef ORC_SKELETON_HAS_PREVIEW_HELPERS
+// ---------------------------------------------------------------------------
+// Portable fallback rendering — used when building against an installed SDK
+// that does not expose the orc-core PreviewHelpers.  The fast path using
+// PreviewHelpers (above) is compiled instead for in-tree builds.
+// ---------------------------------------------------------------------------
 
 uint8_t sample_to_byte(uint16_t sample)
 {
     return static_cast<uint8_t>(sample >> 8);
 }
 
-PreviewImage render_field_preview(
-    const std::shared_ptr<const VideoFieldRepresentation>& representation,
-    FieldID field_id,
-    PreviewChannel channel)
+const VideoFieldRepresentation::sample_type* get_channel_line(
+    const VideoFieldRepresentation* rep,
+    FieldID field_id, uint32_t line_index, bool want_chroma)
+{
+    if (!rep) return nullptr;
+    if (!rep->has_separate_channels()) return rep->get_line(field_id, line_index);
+    if (want_chroma) {
+        const auto* ch = rep->get_line_chroma(field_id, line_index);
+        return ch ? ch : rep->get_line(field_id, line_index);
+    }
+    const auto* luma = rep->get_line_luma(field_id, line_index);
+    return luma ? luma : rep->get_line(field_id, line_index);
+}
+
+PreviewImage render_field_fallback(
+    const std::shared_ptr<const VideoFieldRepresentation>& rep, FieldID field_id)
 {
     PreviewImage image{};
-    if (!representation) {
-        return image;
-    }
-
-    const auto descriptor = representation->get_descriptor(field_id);
-    if (!descriptor.has_value() || descriptor->width == 0 || descriptor->height == 0) {
-        return image;
-    }
-
-    image.width = static_cast<uint32_t>(descriptor->width);
-    image.height = static_cast<uint32_t>(descriptor->height);
-    image.rgb_data.resize(static_cast<size_t>(image.width) * static_cast<size_t>(image.height) * 3, 0);
-
+    if (!rep) return image;
+    const auto desc = rep->get_descriptor(field_id);
+    if (!desc.has_value() || desc->width == 0 || desc->height == 0) return image;
+    image.width = static_cast<uint32_t>(desc->width);
+    image.height = static_cast<uint32_t>(desc->height);
+    image.rgb_data.resize(static_cast<size_t>(image.width) * image.height * 3, 0);
     for (uint32_t y = 0; y < image.height; ++y) {
-        const auto* line = get_channel_line(representation.get(), field_id, y, channel);
-        if (!line) {
-            continue;
-        }
-
+        const auto* line = get_channel_line(rep.get(), field_id, y, false);
+        if (!line) continue;
         for (uint32_t x = 0; x < image.width; ++x) {
-            const auto luma = sample_to_byte(sample_for_channel(representation.get(), field_id, y, x, channel));
-            const auto offset = (static_cast<size_t>(y) * image.width + x) * 3;
-            image.rgb_data[offset] = luma;
-            image.rgb_data[offset + 1] = luma;
-            image.rgb_data[offset + 2] = luma;
+            const auto v = sample_to_byte(line[x]);
+            const auto off = (static_cast<size_t>(y) * image.width + x) * 3;
+            image.rgb_data[off] = image.rgb_data[off + 1] = image.rgb_data[off + 2] = v;
         }
     }
-
     return image;
 }
 
-PreviewImage render_frame_preview(
-    const std::shared_ptr<const VideoFieldRepresentation>& representation,
-    FieldID first_field,
-    FieldID second_field,
-    PreviewChannel channel)
+PreviewImage render_frame_fallback(
+    const std::shared_ptr<const VideoFieldRepresentation>& rep,
+    uint64_t frame_index)
 {
     PreviewImage image{};
-    if (!representation) {
-        return image;
-    }
-
-    const auto first_desc = representation->get_descriptor(first_field);
-    const auto second_desc = representation->get_descriptor(second_field);
-    if (!first_desc.has_value() || !second_desc.has_value()) {
-        return image;
-    }
-
-    const auto width = static_cast<uint32_t>(std::max(first_desc->width, second_desc->width));
-    const auto first_height = static_cast<uint32_t>(first_desc->height);
-    const auto second_height = static_cast<uint32_t>(second_desc->height);
-    const auto field_height = std::max(first_height, second_height);
-    if (width == 0 || field_height == 0) {
-        return image;
-    }
-
+    if (!rep) return image;
+    const auto range = rep->field_range();
+    if (!range.is_valid()) return image;
+    const auto first_field = FieldID(range.start.value() + frame_index * 2);
+    const auto second_field = FieldID(first_field.value() + 1);
+    if (!rep->has_field(first_field) || !rep->has_field(second_field)) return image;
+    const auto fd1 = rep->get_descriptor(first_field);
+    const auto fd2 = rep->get_descriptor(second_field);
+    if (!fd1.has_value() || !fd2.has_value()) return image;
+    const auto width = static_cast<uint32_t>(std::max(fd1->width, fd2->width));
+    const auto h1 = static_cast<uint32_t>(fd1->height);
+    const auto h2 = static_cast<uint32_t>(fd2->height);
+    const auto fh = std::max(h1, h2);
+    if (width == 0 || fh == 0) return image;
     image.width = width;
-    image.height = field_height * 2;
-    image.rgb_data.resize(static_cast<size_t>(image.width) * static_cast<size_t>(image.height) * 3, 0);
-
+    image.height = fh * 2;
+    image.rgb_data.resize(static_cast<size_t>(image.width) * image.height * 3, 0);
     for (uint32_t y = 0; y < image.height; ++y) {
         const bool use_first = (y % 2) == 0;
-        const uint32_t field_line = y / 2;
-        const auto source_field = use_first ? first_field : second_field;
-        const auto source_height = use_first ? first_height : second_height;
-
-        if (field_line >= source_height) {
-            continue;
-        }
-
-        const auto* line = get_channel_line(representation.get(), source_field, field_line, channel);
-        if (!line) {
-            continue;
-        }
-
+        const uint32_t fl = y / 2;
+        const auto sf = use_first ? first_field : second_field;
+        const auto sh = use_first ? h1 : h2;
+        if (fl >= sh) continue;
+        const auto* line = get_channel_line(rep.get(), sf, fl, false);
+        if (!line) continue;
         for (uint32_t x = 0; x < image.width; ++x) {
-            const auto luma = sample_to_byte(sample_for_channel(representation.get(), source_field, field_line, x, channel));
-            const auto offset = (static_cast<size_t>(y) * image.width + x) * 3;
-            image.rgb_data[offset] = luma;
-            image.rgb_data[offset + 1] = luma;
-            image.rgb_data[offset + 2] = luma;
+            const auto v = sample_to_byte(line[x]);
+            const auto off = (static_cast<size_t>(y) * image.width + x) * 3;
+            image.rgb_data[off] = image.rgb_data[off + 1] = image.rgb_data[off + 2] = v;
         }
     }
-
     return image;
 }
-
-NodeTypeInfo make_node_type_info()
-{
-    return NodeTypeInfo(
-        NodeType::TRANSFORM,
-        "skeleton_passthrough",
-        "Skeleton Passthrough",
-        "Minimal external plugin stage that forwards one input artifact.",
-        1,
-        1,
-        1,
-        1,
-        VideoFormatCompatibility::ALL,
-        SinkCategory::THIRD_PARTY,
-        "Examples");
-}
+#endif // !ORC_SKELETON_HAS_PREVIEW_HELPERS
 
 } // namespace
 
@@ -230,7 +119,11 @@ std::string SkeletonPassthroughStage::version() const
 
 NodeTypeInfo SkeletonPassthroughStage::get_node_type_info() const
 {
-    return make_node_type_info();
+    return NodeTypeInfo{
+        NodeType::TRANSFORM, "skeleton_passthrough", "Skeleton Passthrough",
+        "Minimal external plugin stage that forwards one input artifact.",
+        1, 1, 1, 1, VideoFormatCompatibility::ALL, SinkCategory::THIRD_PARTY, "Examples"
+    };
 }
 
 std::vector<ArtifactPtr> SkeletonPassthroughStage::execute(
@@ -254,46 +147,28 @@ bool SkeletonPassthroughStage::supports_preview() const
 
 std::vector<PreviewOption> SkeletonPassthroughStage::get_preview_options() const
 {
-    if (!cached_output_) {
-        return {};
-    }
-
+    if (!cached_output_) return {};
+#ifdef ORC_SKELETON_HAS_PREVIEW_HELPERS
+    return PreviewHelpers::get_standard_preview_options(cached_output_);
+#else
     const auto range = cached_output_->field_range();
-    if (!range.is_valid()) {
-        return {};
-    }
-
+    if (!range.is_valid()) return {};
     const auto first_descriptor = cached_output_->get_descriptor(range.start);
-    if (!first_descriptor.has_value() || first_descriptor->width == 0 || first_descriptor->height == 0) {
-        return {};
-    }
-
-    std::vector<PreviewOption> options;
+    if (!first_descriptor.has_value() || first_descriptor->width == 0 || first_descriptor->height == 0) return {};
     const auto field_count = cached_output_->field_count();
-
-    options.push_back(PreviewOption{
-        "field",
-        "Field",
-        false,
-        static_cast<uint32_t>(first_descriptor->width),
-        static_cast<uint32_t>(first_descriptor->height),
-        field_count,
-        1.0,
-    });
-
+    const auto w = static_cast<uint32_t>(first_descriptor->width);
+    const auto h = static_cast<uint32_t>(first_descriptor->height);
+    std::vector<PreviewOption> options;
+    options.push_back(PreviewOption{"field",     "Field",     false, w, h,     field_count,     1.0});
+    options.push_back(PreviewOption{"field_raw", "Field Raw", false, w, h,     field_count,     1.0});
     if (field_count >= 2) {
-        options.push_back(PreviewOption{
-            "frame",
-            "Frame",
-            false,
-            static_cast<uint32_t>(first_descriptor->width),
-            static_cast<uint32_t>(first_descriptor->height * 2),
-            field_count / 2,
-            1.0,
-        });
+        options.push_back(PreviewOption{"split",     "Split",     false, w, h * 2, field_count / 2, 1.0});
+        options.push_back(PreviewOption{"split_raw", "Split Raw", false, w, h * 2, field_count / 2, 1.0});
+        options.push_back(PreviewOption{"frame",     "Frame",     false, w, h * 2, field_count / 2, 1.0});
+        options.push_back(PreviewOption{"frame_raw", "Frame Raw", false, w, h * 2, field_count / 2, 1.0});
     }
-
     return options;
+#endif
 }
 
 PreviewImage SkeletonPassthroughStage::render_preview(
@@ -301,44 +176,27 @@ PreviewImage SkeletonPassthroughStage::render_preview(
     uint64_t index,
     PreviewNavigationHint hint) const
 {
-    if (!cached_output_) {
-        return PreviewImage{};
-    }
-
+    if (!cached_output_) return PreviewImage{};
+#ifdef ORC_SKELETON_HAS_PREVIEW_HELPERS
+    return PreviewHelpers::render_standard_preview(cached_output_, option_id, index, hint);
+#else
     (void)hint;
-    const auto parsed_option = parse_preview_option_id(option_id);
-
     const auto range = cached_output_->field_range();
-    if (!range.is_valid()) {
-        return PreviewImage{};
-    }
-
-    if (parsed_option.base_option_id == "field" || parsed_option.base_option_id == "field_raw") {
-        if (index >= cached_output_->field_count()) {
-            return PreviewImage{};
-        }
+    if (!range.is_valid()) return PreviewImage{};
+    if (option_id == "field" || option_id == "field_raw") {
+        if (index >= cached_output_->field_count()) return PreviewImage{};
         const auto field_id = FieldID(range.start.value() + index);
-        if (!cached_output_->has_field(field_id)) {
-            return PreviewImage{};
-        }
-        return render_field_preview(cached_output_, field_id, parsed_option.channel);
+        if (!cached_output_->has_field(field_id)) return PreviewImage{};
+        return render_field_fallback(cached_output_, field_id);
     }
-
-    if (parsed_option.base_option_id == "frame" || parsed_option.base_option_id == "frame_raw") {
+    if (option_id == "split"     || option_id == "split_raw" ||
+        option_id == "frame"     || option_id == "frame_raw") {
         const auto frame_count = cached_output_->field_count() / 2;
-        if (index >= frame_count) {
-            return PreviewImage{};
-        }
-
-        const auto first_field = FieldID(range.start.value() + (index * 2));
-        const auto second_field = FieldID(first_field.value() + 1);
-        if (!cached_output_->has_field(first_field) || !cached_output_->has_field(second_field)) {
-            return PreviewImage{};
-        }
-        return render_frame_preview(cached_output_, first_field, second_field, parsed_option.channel);
+        if (index >= frame_count) return PreviewImage{};
+        return render_frame_fallback(cached_output_, index);
     }
-
     return PreviewImage{};
+#endif
 }
 
 size_t SkeletonPassthroughStage::required_input_count() const

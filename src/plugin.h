@@ -1,3 +1,11 @@
+/*
+ * File:        plugin.h
+ * Module:      orc-stage-plugin-skeleton-passthrough
+ * Purpose:     Plugin entrypoint metadata for SkeletonPassthroughStage
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-FileCopyrightText: 2026 <Your Name>
+ */
+
 #pragma once
 
 #include "orc_plugin_sdk_compat.h"

@@ -1,3 +1,11 @@
+/*
+ * File:        skeleton_passthrough_stage.h
+ * Module:      orc-stage-plugin-skeleton-passthrough
+ * Purpose:     Passthrough stage that forwards one input artifact unchanged
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-FileCopyrightText: 2026 <Your Name>
+ */
+
 #pragma once
 
 #include "orc_plugin_sdk_compat.h"

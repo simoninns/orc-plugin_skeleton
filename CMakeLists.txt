@@ -58,6 +58,21 @@ if(DEFINED ORC_INTREE_SDK_DIR)
         ${ORC_INTREE_SDK_DIR}/orc/sdk/include
     )
     target_link_libraries(orc-plugin-sdk INTERFACE orc-core)
+
+    # When the compiled orc-core library is present (i.e. the host project has
+    # been built), link it so in-tree plugins can call into orc-core APIs such
+    # as PreviewHelpers that are not header-only.
+    if(NOT DEFINED ORC_INTREE_BUILD_DIR)
+        set(ORC_INTREE_BUILD_DIR "${ORC_INTREE_SDK_DIR}/build")
+    endif()
+    find_library(_orc_core_compiled_lib NAMES orc-core
+        HINTS "${ORC_INTREE_BUILD_DIR}/lib" "${ORC_INTREE_BUILD_DIR}"
+        NO_DEFAULT_PATH
+    )
+    if(_orc_core_compiled_lib)
+        target_link_libraries(orc-core INTERFACE "${_orc_core_compiled_lib}")
+    endif()
+    unset(_orc_core_compiled_lib CACHE)
 else()
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/DecodeOrcPluginSDKHelpers.cmake")
     find_package(decode-orc-plugin-sdk REQUIRED)
