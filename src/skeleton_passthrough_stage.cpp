@@ -8,26 +8,11 @@
 
 #include "skeleton_passthrough_stage.h"
 
-// Use the optimised rendering pipeline from orc-core when building in-tree.
-// When building against an installed/distributed SDK this header is not
-// available, so the portable fallback implementation below is used instead.
-#if __has_include(<preview_helpers.h>)
-#  include <preview_helpers.h>
-#  define ORC_SKELETON_HAS_PREVIEW_HELPERS 1
-#else
-#  include <algorithm>
-#endif
+#include <algorithm>
 
 namespace orc::plugins::skeleton {
 
 namespace {
-
-#ifndef ORC_SKELETON_HAS_PREVIEW_HELPERS
-// ---------------------------------------------------------------------------
-// Portable fallback rendering — used when building against an installed SDK
-// that does not expose the orc-core PreviewHelpers.  The fast path using
-// PreviewHelpers (above) is compiled instead for in-tree builds.
-// ---------------------------------------------------------------------------
 
 uint8_t sample_to_byte(uint16_t sample)
 {
@@ -48,7 +33,7 @@ const VideoFieldRepresentation::sample_type* get_channel_line(
     return luma ? luma : rep->get_line(field_id, line_index);
 }
 
-PreviewImage render_field_fallback(
+PreviewImage render_field_preview(
     const std::shared_ptr<const VideoFieldRepresentation>& rep, FieldID field_id)
 {
     PreviewImage image{};
@@ -70,7 +55,7 @@ PreviewImage render_field_fallback(
     return image;
 }
 
-PreviewImage render_frame_fallback(
+PreviewImage render_frame_preview(
     const std::shared_ptr<const VideoFieldRepresentation>& rep,
     uint64_t frame_index)
 {
@@ -108,7 +93,6 @@ PreviewImage render_frame_fallback(
     }
     return image;
 }
-#endif // !ORC_SKELETON_HAS_PREVIEW_HELPERS
 
 } // namespace
 
@@ -148,9 +132,6 @@ bool SkeletonPassthroughStage::supports_preview() const
 std::vector<PreviewOption> SkeletonPassthroughStage::get_preview_options() const
 {
     if (!cached_output_) return {};
-#ifdef ORC_SKELETON_HAS_PREVIEW_HELPERS
-    return PreviewHelpers::get_standard_preview_options(cached_output_);
-#else
     const auto range = cached_output_->field_range();
     if (!range.is_valid()) return {};
     const auto first_descriptor = cached_output_->get_descriptor(range.start);
@@ -168,7 +149,6 @@ std::vector<PreviewOption> SkeletonPassthroughStage::get_preview_options() const
         options.push_back(PreviewOption{"frame_raw", "Frame Raw", false, w, h * 2, field_count / 2, 1.0});
     }
     return options;
-#endif
 }
 
 PreviewImage SkeletonPassthroughStage::render_preview(
@@ -177,9 +157,6 @@ PreviewImage SkeletonPassthroughStage::render_preview(
     PreviewNavigationHint hint) const
 {
     if (!cached_output_) return PreviewImage{};
-#ifdef ORC_SKELETON_HAS_PREVIEW_HELPERS
-    return PreviewHelpers::render_standard_preview(cached_output_, option_id, index, hint);
-#else
     (void)hint;
     const auto range = cached_output_->field_range();
     if (!range.is_valid()) return PreviewImage{};
@@ -187,16 +164,15 @@ PreviewImage SkeletonPassthroughStage::render_preview(
         if (index >= cached_output_->field_count()) return PreviewImage{};
         const auto field_id = FieldID(range.start.value() + index);
         if (!cached_output_->has_field(field_id)) return PreviewImage{};
-        return render_field_fallback(cached_output_, field_id);
+        return render_field_preview(cached_output_, field_id);
     }
     if (option_id == "split"     || option_id == "split_raw" ||
         option_id == "frame"     || option_id == "frame_raw") {
         const auto frame_count = cached_output_->field_count() / 2;
         if (index >= frame_count) return PreviewImage{};
-        return render_frame_fallback(cached_output_, index);
+        return render_frame_preview(cached_output_, index);
     }
     return PreviewImage{};
-#endif
 }
 
 size_t SkeletonPassthroughStage::required_input_count() const

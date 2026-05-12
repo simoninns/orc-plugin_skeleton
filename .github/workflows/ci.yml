@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ORC_SDK_DIR: ${{ github.workspace }}/decode-orc
-      ORC_SDK_REF: 20260503-001
+      ORC_SDK_REF: main
       ORC_CMAKE_ARGS: -DORC_INTREE_SDK_DIR=${{ github.workspace }}/decode-orc -DBUILD_TESTS=ON
     strategy:
       fail-fast: false
@@ -69,6 +69,12 @@ jobs:
           if (-not (Test-Path "$env:ORC_SDK_DIR/orc/sdk/include/orc/plugin/orc_stage_runtime.h")) {
             throw "Missing orc_stage_runtime.h in SDK checkout"
           }
+
+      - name: Enforce SDK boundary
+        shell: bash
+        run: |
+          chmod +x scripts/check_sdk_boundary.sh
+          ./scripts/check_sdk_boundary.sh .
 
       - name: Configure (Nix)
         if: matrix.use_nix

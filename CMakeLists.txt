@@ -31,8 +31,8 @@ option(BUILD_TESTS "Build skeleton plugin tests" ON)
 if(DEFINED ORC_INTREE_SDK_DIR)
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/DecodeOrcPluginSDKHelpers.cmake")
 
-    add_library(orc-core INTERFACE)
-    target_include_directories(orc-core INTERFACE
+    add_library(orc-sdk-includes INTERFACE)
+    target_include_directories(orc-sdk-includes INTERFACE
         ${ORC_INTREE_SDK_DIR}/orc/common/include
         ${ORC_INTREE_SDK_DIR}/orc/core/include
         ${ORC_INTREE_SDK_DIR}/orc/core/stages
@@ -43,13 +43,13 @@ if(DEFINED ORC_INTREE_SDK_DIR)
     # Fall back to a Nix store glob for Linux/macOS Nix dev shells.
     find_package(fmt CONFIG QUIET)
     if(fmt_FOUND)
-        target_link_libraries(orc-core INTERFACE fmt::fmt-header-only)
+        target_link_libraries(orc-sdk-includes INTERFACE fmt::fmt-header-only)
     else()
         file(GLOB _orc_fmt_include_candidates "/nix/store/*-fmt-*/include")
         list(LENGTH _orc_fmt_include_candidates _orc_fmt_include_count)
         if(_orc_fmt_include_count GREATER 0)
             list(GET _orc_fmt_include_candidates 0 _orc_fmt_include_dir)
-            target_include_directories(orc-core INTERFACE ${_orc_fmt_include_dir})
+            target_include_directories(orc-sdk-includes INTERFACE ${_orc_fmt_include_dir})
         endif()
     endif()
 
@@ -57,22 +57,7 @@ if(DEFINED ORC_INTREE_SDK_DIR)
     target_include_directories(orc-plugin-sdk INTERFACE
         ${ORC_INTREE_SDK_DIR}/orc/sdk/include
     )
-    target_link_libraries(orc-plugin-sdk INTERFACE orc-core)
-
-    # When the compiled orc-core library is present (i.e. the host project has
-    # been built), link it so in-tree plugins can call into orc-core APIs such
-    # as PreviewHelpers that are not header-only.
-    if(NOT DEFINED ORC_INTREE_BUILD_DIR)
-        set(ORC_INTREE_BUILD_DIR "${ORC_INTREE_SDK_DIR}/build")
-    endif()
-    find_library(_orc_core_compiled_lib NAMES orc-core
-        HINTS "${ORC_INTREE_BUILD_DIR}/lib" "${ORC_INTREE_BUILD_DIR}"
-        NO_DEFAULT_PATH
-    )
-    if(_orc_core_compiled_lib)
-        target_link_libraries(orc-core INTERFACE "${_orc_core_compiled_lib}")
-    endif()
-    unset(_orc_core_compiled_lib CACHE)
+    target_link_libraries(orc-plugin-sdk INTERFACE orc-sdk-includes)
 else()
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/DecodeOrcPluginSDKHelpers.cmake")
     find_package(decode-orc-plugin-sdk REQUIRED)
