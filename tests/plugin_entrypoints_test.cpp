@@ -1,6 +1,7 @@
-#include "orc_plugin_sdk_compat.h"
+#include <orc/plugin/orc_plugin_sdk.h>
 
 #include <iostream>
+#include <string>
 
 ORC_STAGE_PLUGIN_EXPORT const orc::StagePluginDescriptor* orc_get_stage_plugin_descriptor();
 ORC_STAGE_PLUGIN_EXPORT bool orc_register_stage_plugin(
@@ -37,6 +38,22 @@ int main()
 
     if (descriptor->host_abi_version != orc::kStagePluginHostAbiVersion) {
         std::cerr << "Host ABI mismatch\n";
+        return 1;
+    }
+
+    if (descriptor->plugin_api_version != orc::kStagePluginApiVersion) {
+        std::cerr << "Plugin API version mismatch\n";
+        return 1;
+    }
+
+    // ABI v5: the loader requires the descriptor's toolchain tag to equal the
+    // host's tag exactly. This test binary is built with the same toolchain
+    // as the plugin objects, so the tags must match here too.
+    if (!descriptor->toolchain_tag ||
+        std::string(descriptor->toolchain_tag) != ORC_SDK_TOOLCHAIN_TAG) {
+        std::cerr << "Toolchain tag mismatch: "
+                  << (descriptor->toolchain_tag ? descriptor->toolchain_tag : "<null>")
+                  << " != " << ORC_SDK_TOOLCHAIN_TAG << '\n';
         return 1;
     }
 

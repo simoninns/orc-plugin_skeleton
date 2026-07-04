@@ -14,7 +14,7 @@ This repository is intended to be the canonical starter template for third-party
 - Cross-platform CI workflow targets for Linux, macOS, and Windows
 - Release workflow that uploads platform plugin artifacts
 
-## SDK Contract (Current)
+## SDK Contract (Decode-Orc 2.x — host ABI 5 / plugin API 2)
 
 - Include only the public SDK umbrella header in plugin/stage code:
 
@@ -26,9 +26,10 @@ This repository is intended to be the canonical starter template for third-party
 	- `orc_get_stage_plugin_descriptor`
 	- `orc_register_stage_plugin`
 
-- Set descriptor versions from SDK constants:
-	- `orc::kStagePluginHostAbiVersion`
-	- `orc::kStagePluginApiVersion`
+- Build the descriptor with the `ORC_STAGE_PLUGIN_DESCRIPTOR` macro, which
+	fills in the host ABI version, plugin API version, and toolchain tag from
+	the SDK the plugin is compiled against. The host requires all three to
+	match exactly at load time; plugins built against a 1.x SDK are refused.
 
 ## Plugin Version Source
 
@@ -43,24 +44,21 @@ cmake -S . -B build -DORC_PLUGIN_VERSION=1.2.3
 
 ## Preview Hook
 
-This skeleton stage includes a minimal field/frame preview implementation to show how external transform plugins integrate with Decode-Orc's preview dialog.
+This skeleton stage shows how external transform plugins integrate with Decode-Orc's preview dialog under the Decode-Orc 2.x structured preview contract, which replaced the legacy `PreviewableStage` interface. Stages no longer render preview images themselves — they declare what data they can supply and the host does all rendering.
 
-In `SkeletonPassthroughStage`, the preview integration is exposed through the `PreviewableStage` interface:
+In `SkeletonPassthroughStage`, the preview integration is exposed through the `IStagePreviewCapability` interface:
 
-- `supports_preview()`
-  - Returns `true` to advertise that preview is available.
-- `get_preview_options()`
-  - Returns the preview modes exposed to the GUI (for example `field` and `frame`), including dimensions and item counts.
-- `render_preview(option_id, index, hint)`
-  - Renders and returns an RGB preview image for the selected mode/index.
+- `get_preview_capability()`
+  - Returns a `StagePreviewCapability` declaring the data types the stage can supply (composite or Y/C, PAL or NTSC), the navigable frame range, and the active picture geometry / display aspect ratio.
+  - Returns an `is_valid() == false` capability until data has been loaded.
 
 Execution and preview are connected by a small cache:
 
 - `execute(...)` passes input artifact `0` through unchanged
-- The same input is cached as a `VideoFieldRepresentation`
-- Preview methods read from that cached representation when the GUI requests field/frame previews
+- The same input is cached as a `VideoFrameRepresentation` (frame-based CVBS_U10_4FSC data, the Decode-Orc 2.x signal contract)
+- `get_preview_capability()` describes that cached representation to the host, which renders the preview itself
 
-This is intentionally simple (grayscale luma rendering and basic field-pair frame weaving) so third-party authors can copy the pattern and replace only the rendering logic needed by their stage.
+Plugins built against the installed SDK package can simply return `PreviewHelpers::make_signal_preview_capability(cached_output_)`; this skeleton composes the capability by hand so it also builds in the header-only in-tree CI configuration, which links no host libraries. Stages that modify sample data should extend `VideoFrameRepresentationWrapper` instead of forwarding the input artifact unchanged — see the "Transform stages" section of the decode-orc plugin SDK guide (`docs/technical/plugin-sdk.md` in the decode-orc repository).
 
 ## Local Build (installed SDK)
 
@@ -87,6 +85,8 @@ ctest --test-dir build --output-on-failure
 ```bash
 nix develop
 ```
+
+This repository's flake tracks the same nixpkgs release as decode-orc's flake, so the shell provides the same C++ toolchain as a decode-orc host built from its own `nix develop` / `nix build`. This matters: since Decode-Orc 2.0 (host ABI 5) the loader requires the plugin's toolchain tag (compiler family + major version + standard library, e.g. `gcc15/libstdc++`) to equal the host's exactly, and rejects the plugin otherwise. If you build the host from a different environment, build the plugin from that same environment.
 
 3. Configure and build:
 

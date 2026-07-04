@@ -22,5 +22,12 @@ int main()
         return 1;
     }
 
+    // Before execute() has cached any frame data the preview capability
+    // must report is_valid() == false (Decode-Orc 2.x preview contract).
+    if (stage.get_preview_capability().is_valid()) {
+        std::cerr << "Preview capability must be invalid before execute()\n";
+        return 1;
+    }
+
     return 0;
 }

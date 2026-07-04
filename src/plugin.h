@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "orc_plugin_sdk_compat.h"
+#include <orc/plugin/orc_plugin_sdk.h>
 
 #ifndef ORC_STAGE_PLUGIN_VERSION
 #define ORC_STAGE_PLUGIN_VERSION "dev"
@@ -63,30 +63,26 @@ static_assert(kStageMenuCategory[0] != '\0', "kStageMenuCategory must not be emp
 static_assert(kStageMaxInputs >= kStageMinInputs, "kStageMaxInputs must be >= kStageMinInputs");
 static_assert(kStageMaxOutputs >= kStageMinOutputs, "kStageMaxOutputs must be >= kStageMinOutputs");
 
-inline constexpr orc::StagePluginDescriptor kPluginDescriptor{
-    // Reverse-domain unique plugin ID.
-    // Allowed: non-empty unique identifier string.
-    "org.decodeorc.stage.skeleton_passthrough",
+// The ORC_STAGE_PLUGIN_DESCRIPTOR macro fills in the host ABI version, the
+// plugin API version, and the toolchain tag from the SDK the plugin is
+// compiled against — the descriptor fields a plugin author must never set by
+// hand (the host rejects the plugin unless all three match it exactly).
+inline constexpr orc::StagePluginDescriptor kPluginDescriptor =
+    ORC_STAGE_PLUGIN_DESCRIPTOR(
+        // Reverse-domain unique plugin ID.
+        // Allowed: non-empty unique identifier string.
+        "org.decodeorc.stage.skeleton_passthrough",
 
-    // Plugin semantic version string provided by build system.
-    // Allowed: non-empty version string (for example "1.2.3").
-    ORC_STAGE_PLUGIN_VERSION,
+        // Plugin semantic version string provided by build system.
+        // Allowed: non-empty version string (for example "1.2.3").
+        ORC_STAGE_PLUGIN_VERSION,
 
-    // Host ABI compatibility value.
-    // Allowed: must equal orc::kStagePluginHostAbiVersion.
-    orc::kStagePluginHostAbiVersion,
+        // SPDX license expression.
+        // Allowed: valid SPDX expression string.
+        "GPL-3.0-or-later",
 
-    // Plugin API compatibility value.
-    // Allowed: must equal orc::kStagePluginApiVersion.
-    orc::kStagePluginApiVersion,
-
-    // SPDX license expression.
-    // Allowed: valid SPDX expression string.
-    "GPL-3.0-or-later",
-
-    // Flags plugin provenance relative to host distribution.
-    // Allowed: true (bundled/core plugin) or false (external/third-party).
-    false,
-};
+        // Flags plugin provenance relative to host distribution.
+        // Allowed: true (bundled/core plugin) or false (external/third-party).
+        false);
 
 } // namespace orc::plugins::skeleton

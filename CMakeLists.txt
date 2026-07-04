@@ -31,13 +31,10 @@ option(BUILD_TESTS "Build skeleton plugin tests" ON)
 if(DEFINED ORC_INTREE_SDK_DIR)
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/DecodeOrcPluginSDKHelpers.cmake")
 
+    # Since Decode-Orc 2.0 the SDK include surface is fully self-contained
+    # under orc/sdk/include (<orc/plugin/...> and <orc/stage/...>); private
+    # host include trees must not be exposed to plugin code.
     add_library(orc-sdk-includes INTERFACE)
-    target_include_directories(orc-sdk-includes INTERFACE
-        ${ORC_INTREE_SDK_DIR}/orc/common/include
-        ${ORC_INTREE_SDK_DIR}/orc/core/include
-        ${ORC_INTREE_SDK_DIR}/orc/core/stages
-        ${ORC_INTREE_SDK_DIR}/orc/view-types
-    )
 
     # Try to find fmt via CMake config (works with vcpkg toolchain on Windows).
     # Fall back to a Nix store glob for Linux/macOS Nix dev shells.
