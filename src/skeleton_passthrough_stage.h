@@ -33,6 +33,11 @@ public:
     std::string version() const override;
     NodeTypeInfo get_node_type_info() const override;
 
+    // Implements DAGStage::get_instructions() (the stage help shown by the
+    // host) by reading the instructions.md that orc_add_stage_plugin() copies
+    // alongside the plugin shared library. Returns "" if the file is missing.
+    ORC_STAGE_INSTRUCTIONS_MD
+
     std::vector<ArtifactPtr> execute(
         const std::vector<ArtifactPtr>& inputs,
         const std::map<std::string, ParameterValue>& parameters,

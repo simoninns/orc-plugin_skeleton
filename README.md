@@ -10,6 +10,7 @@ This repository is intended to be the canonical starter template for third-party
 - Required plugin entrypoints:
 	- `orc_get_stage_plugin_descriptor`
 	- `orc_register_stage_plugin`
+- Example stage help text (`instructions.md`) wired into the host help dialog
 - Local smoke tests for stage metadata and entrypoint registration
 - Cross-platform CI workflow targets for Linux, macOS, and Windows
 - Release workflow that uploads platform plugin artifacts
@@ -59,6 +60,16 @@ Execution and preview are connected by a small cache:
 - `get_preview_capability()` describes that cached representation to the host, which renders the preview itself
 
 Plugins built against the installed SDK package can simply return `PreviewHelpers::make_signal_preview_capability(cached_output_)`; this skeleton composes the capability by hand so it also builds in the header-only in-tree CI configuration, which links no host libraries. Stages that modify sample data should extend `VideoFrameRepresentationWrapper` instead of forwarding the input artifact unchanged — see the "Transform stages" section of the decode-orc plugin SDK guide (`docs/technical/plugin-sdk.md` in the decode-orc repository).
+
+## Stage Help Hook
+
+Decode-Orc shows per-stage documentation through `DAGStage::get_instructions()`, which returns Markdown rendered by the host help dialog. This skeleton wires it up the preferred way — a standalone `instructions.md` file rather than an inline string:
+
+- `instructions.md` in the repository root holds the stage documentation (Markdown).
+- `SkeletonPassthroughStage` adds the SDK's `ORC_STAGE_INSTRUCTIONS_MD` macro (from `<orc/plugin/orc_stage_tooling.h>`, already included via the umbrella header) to its public section. The macro implements `get_instructions()` by locating the loaded plugin library with `dladdr` / `GetModuleHandleEx` and reading the `.md` file next to it.
+- `orc_add_stage_plugin()` detects `instructions.md` in the plugin source directory automatically, copies it to `lib<plugin>.md` beside the built library, and installs it with the plugin. Editing the file triggers a re-copy without rebuilding the stage.
+
+To document your own stage, keep the macro in the class and edit `instructions.md`. For plugins that cannot ship a sidecar file, the SDK also offers the legacy `ORC_STAGE_INSTRUCTIONS(<string>)` macro to embed the Markdown inline.
 
 ## Local Build (installed SDK)
 
