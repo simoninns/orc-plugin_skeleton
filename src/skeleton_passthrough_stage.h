@@ -19,7 +19,7 @@
 namespace orc::plugins::skeleton {
 
 // Minimal passthrough transform for the Decode-Orc 2.x plugin SDK
-// (host ABI 5 / plugin API 2). Demonstrates the two contracts every
+// (host ABI 7 / plugin API 2). Demonstrates the two contracts every
 // preview-capable transform implements:
 //
 // - DAGStage::execute() over frame-based artifacts: inputs carrying video

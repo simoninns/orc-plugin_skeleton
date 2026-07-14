@@ -15,7 +15,7 @@ This repository is intended to be the canonical starter template for third-party
 - Cross-platform CI workflow targets for Linux, macOS, and Windows
 - Release workflow that uploads platform plugin artifacts
 
-## SDK Contract (Decode-Orc 2.x — host ABI 5 / plugin API 2)
+## SDK Contract (Decode-Orc 2.x — host ABI 7 / plugin API 2)
 
 - Include only the public SDK umbrella header in plugin/stage code:
 

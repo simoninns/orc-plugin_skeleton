@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ORC_SDK_DIR: ${{ github.workspace }}/decode-orc
-      ORC_SDK_REF: v2.0.0
+      ORC_SDK_REF: v2.2.0
       ORC_CMAKE_ARGS: -DORC_INTREE_SDK_DIR=${{ github.workspace }}/decode-orc -DBUILD_TESTS=ON
     strategy:
       fail-fast: false
