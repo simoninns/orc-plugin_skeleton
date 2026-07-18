@@ -15,13 +15,20 @@ This repository is intended to be the canonical starter template for third-party
 - Cross-platform CI workflow targets for Linux, macOS, and Windows
 - Release workflow that uploads platform plugin artifacts
 
-## SDK Contract (Decode-Orc 2.x — host ABI 7 / plugin API 2)
+## SDK Contract (Decode-Orc 2.x — host ABI 10 / plugin API 2)
 
 - Include only the public SDK umbrella header in plugin/stage code:
 
 ```cpp
-#include <orc/plugin/orc_plugin_sdk.h>
+#include <orc/abi/orc_plugin_sdk.h>
 ```
+
+  The SDK is now tiered: `orc/abi/` holds the frozen binary contract
+  (descriptor, entrypoints, registration, services), `orc/stage/` the stage
+  interfaces and data types, and `orc/support/` the header/helper conveniences.
+  The umbrella above pulls in everything a stage plugin needs. The former
+  `<orc/plugin/orc_plugin_sdk.h>` path is a deprecated shim retained for one
+  release — include the `orc/abi/` path directly.
 
 - Export the two required entrypoints:
 	- `orc_get_stage_plugin_descriptor`

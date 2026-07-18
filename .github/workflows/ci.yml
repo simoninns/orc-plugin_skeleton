@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ORC_SDK_DIR: ${{ github.workspace }}/decode-orc
-      ORC_SDK_REF: v2.2.0
+      ORC_SDK_REF: 20260717-abi
       ORC_CMAKE_ARGS: -DORC_INTREE_SDK_DIR=${{ github.workspace }}/decode-orc -DBUILD_TESTS=ON
     strategy:
       fail-fast: false
@@ -52,7 +52,7 @@ jobs:
       - name: Verify SDK headers (POSIX)
         if: runner.os != 'Windows'
         run: |
-          test -f "$ORC_SDK_DIR/orc/sdk/include/orc/plugin/orc_plugin_sdk.h"
+          test -f "$ORC_SDK_DIR/orc/sdk/include/orc/abi/orc_plugin_sdk.h"
           test -f "$ORC_SDK_DIR/orc/sdk/include/orc/plugin/orc_stage_preview.h"
           test -f "$ORC_SDK_DIR/orc/sdk/include/orc/plugin/orc_stage_runtime.h"
 
@@ -60,7 +60,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (-not (Test-Path "$env:ORC_SDK_DIR/orc/sdk/include/orc/plugin/orc_plugin_sdk.h")) {
+          if (-not (Test-Path "$env:ORC_SDK_DIR/orc/sdk/include/orc/abi/orc_plugin_sdk.h")) {
             throw "Missing orc_plugin_sdk.h in SDK checkout"
           }
           if (-not (Test-Path "$env:ORC_SDK_DIR/orc/sdk/include/orc/plugin/orc_stage_preview.h")) {
