@@ -15,7 +15,7 @@ This repository is intended to be the canonical starter template for third-party
 - Cross-platform CI workflow targets for Linux, macOS, and Windows
 - Release workflow that uploads platform plugin artifacts
 
-## SDK Contract (Decode-Orc 2.x — host ABI 10 / plugin API 2)
+## SDK Contract (Decode-Orc 2.x — host ABI 11 / plugin API 3)
 
 - Include only the public SDK umbrella header in plugin/stage code:
 
@@ -67,6 +67,8 @@ Execution and preview are connected by a small cache:
 - `get_preview_capability()` describes that cached representation to the host, which renders the preview itself
 
 Plugins built against the installed SDK package can simply return `PreviewHelpers::make_signal_preview_capability(cached_output_)`; this skeleton composes the capability by hand so it also builds in the header-only in-tree CI configuration, which links no host libraries. Stages that modify sample data should extend `VideoFrameRepresentationWrapper` instead of forwarding the input artifact unchanged — see the "Transform stages" section of the decode-orc plugin SDK guide (`docs/technical/plugin-sdk.md` in the decode-orc repository).
+
+Since host ABI 11, such a wrapper should also override `video_passthrough_source(FrameID)` to return the wrapped source for any frame whose CVBS video content it leaves byte-identical (for example a correction pass over a frame with nothing to correct, or a stage that only appends an audio channel pair). The host uses that declaration to share frame-content-keyed stored observations with the upstream node instead of re-analysing identical samples. The answer must come from metadata alone — never decode samples to compare — and returning `nullptr`, the default, is always safe. This skeleton forwards the input pointer itself, so the host already sees a single representation and needs no declaration.
 
 ## Stage Help Hook
 
