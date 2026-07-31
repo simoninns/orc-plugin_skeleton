@@ -36,8 +36,18 @@ std::vector<ArtifactPtr> SkeletonPassthroughStage::execute(
 
     // A passthrough forwards the artifact unchanged; caching it as a
     // VideoFrameRepresentation is what enables the preview capability below.
+    // Forwarding the input pointer itself means the host already sees one
+    // representation, so its frame-content-keyed analysis is shared for free.
+    //
     // Stages that modify sample data instead wrap the input in a
-    // VideoFrameRepresentationWrapper subclass and forward that.
+    // VideoFrameRepresentationWrapper subclass and forward that. Since host
+    // ABI 11 such a wrapper should override
+    // VideoFrameRepresentation::video_passthrough_source(FrameID) to return
+    // the wrapped source for any frame whose CVBS video content it leaves
+    // byte-identical (a no-op correction pass, or a stage that only appends
+    // audio); the host then reuses the upstream frame's stored observations
+    // instead of re-analysing identical samples. Returning nullptr — the
+    // default — is always safe, and the answer must come from metadata alone.
     cached_output_ = std::dynamic_pointer_cast<const VideoFrameRepresentation>(inputs.at(0));
     return {inputs.at(0)};
 }

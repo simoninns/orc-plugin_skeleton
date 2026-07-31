@@ -15,10 +15,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ORC_SDK_DIR: ${{ github.workspace }}/decode-orc
-      # Host SDK the plugin is built against. Track decode-orc main; pin only
-      # to an existing branch/tag/commit and only deliberately.
-      # 20260729-001 is the ABI 12 / mandatory-manifest branch, pinned here
-      # until it merges to main.
+      # Host SDK the plugin is built against. Normally `main`; pinned to
+      # 20260729-001 (host ABI 12 / mandatory release manifest) until that
+      # branch merges, then restore `main`.
       ORC_SDK_REF: 20260729-001
       ORC_CMAKE_ARGS: -DORC_INTREE_SDK_DIR=${{ github.workspace }}/decode-orc -DBUILD_TESTS=ON
     strategy:
