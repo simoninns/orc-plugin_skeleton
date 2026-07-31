@@ -18,9 +18,12 @@ shift
 # Header fields come from the first fragment; every fragment is generated
 # from the same descriptor, so a disagreement means the matrix built
 # mismatched sources and the release must not be published.
+# Fragments built on Windows can arrive with CRLF line endings, so every field
+# is read with the trailing CR stripped: an invisible difference must not read
+# as mismatched sources, and must not reach the published manifest.
 first="$1"
-plugin_id="$(awk -F': ' '/^plugin_id:/ {print $2; exit}' "$first")"
-plugin_version="$(awk -F': ' '/^plugin_version:/ {print $2; exit}' "$first")"
+plugin_id="$(awk -F': ' '/^plugin_id:/ {sub(/\r$/, "", $2); print $2; exit}' "$first")"
+plugin_version="$(awk -F': ' '/^plugin_version:/ {sub(/\r$/, "", $2); print $2; exit}' "$first")"
 
 if [[ -z "$plugin_id" || -z "$plugin_version" ]]; then
     echo "Fragment $first is missing plugin_id or plugin_version"
@@ -36,8 +39,8 @@ fi
 } > "$output"
 
 for fragment in "$@"; do
-    fragment_id="$(awk -F': ' '/^plugin_id:/ {print $2; exit}' "$fragment")"
-    fragment_version="$(awk -F': ' '/^plugin_version:/ {print $2; exit}' "$fragment")"
+    fragment_id="$(awk -F': ' '/^plugin_id:/ {sub(/\r$/, "", $2); print $2; exit}' "$fragment")"
+    fragment_version="$(awk -F': ' '/^plugin_version:/ {sub(/\r$/, "", $2); print $2; exit}' "$fragment")"
 
     if [[ "$fragment_id" != "$plugin_id" || "$fragment_version" != "$plugin_version" ]]; then
         echo "Fragment $fragment disagrees with $first: ${fragment_id} ${fragment_version}"
@@ -45,7 +48,7 @@ for fragment in "$@"; do
     fi
 
     # Everything after the "artifacts:" line is this platform's artifact list.
-    awk '/^artifacts:/ {found = 1; next} found' "$fragment" >> "$output"
+    awk '/^artifacts:/ {found = 1; next} found {sub(/\r$/, ""); print}' "$fragment" >> "$output"
 done
 
 if ! grep -q '^  - file: ' "$output"; then

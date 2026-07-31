@@ -62,6 +62,12 @@ stage_name=""
 abi=""
 toolchain_tag=""
 
+# orc-plugin-build-info writes its lines with "\n", but a Windows build prints
+# them through a text-mode stdout, so every value would otherwise arrive with a
+# trailing CR and end up embedded in this platform's manifest fragment. That
+# difference is invisible in the YAML and only surfaces when merge_manifests.sh
+# compares the Windows fragment against the Linux one at release time.
+
 while IFS='=' read -r key value; do
     case "$key" in
         plugin_id)      plugin_id="$value" ;;
@@ -70,7 +76,7 @@ while IFS='=' read -r key value; do
         abi)            abi="$value" ;;
         toolchain_tag)  toolchain_tag="$value" ;;
     esac
-done < <("$build_info")
+done < <("$build_info" | tr -d '\r')
 
 for required in plugin_id plugin_version stage_name abi toolchain_tag; do
     if [[ -z "${!required}" ]]; then
