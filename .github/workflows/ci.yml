@@ -15,7 +15,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ORC_SDK_DIR: ${{ github.workspace }}/decode-orc
-      ORC_SDK_REF: 20260717-abi
+      # Host SDK the plugin is built against. Track decode-orc main; pin only
+      # to an existing branch/tag/commit and only deliberately.
+      # 20260729-001 is the ABI 12 / mandatory-manifest branch, pinned here
+      # until it merges to main.
+      ORC_SDK_REF: 20260729-001
       ORC_CMAKE_ARGS: -DORC_INTREE_SDK_DIR=${{ github.workspace }}/decode-orc -DBUILD_TESTS=ON
     strategy:
       fail-fast: false
@@ -110,28 +114,26 @@ jobs:
         if: ${{ !matrix.use_nix }}
         run: ctest --test-dir build --output-on-failure -C Release
 
-      - name: Package artifact (Linux/macOS)
-        if: runner.os != 'Windows'
+      # Names the asset orc-plugin_skeleton_passthrough_<platform>_abi<N>.<ext>
+      # and writes dist/plugin-manifest-<platform>.yaml declaring its platform,
+      # host ABI, toolchain tag and SHA-256 — the facts the mandatory release
+      # manifest is assembled from in publish-release.
+      - name: Package artifact and manifest fragment
+        shell: bash
         run: |
           chmod +x scripts/package_local.sh
           ./scripts/package_local.sh build dist
 
-      - name: Package artifact (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
+      # The real merge only runs on tag builds, so exercise the script on every
+      # platform here: a fragment-format or portability regression then fails
+      # the PR rather than the release.
+      - name: Check manifest fragment merges
+        shell: bash
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $candidate = Get-ChildItem -Path build -Recurse -File -Filter "*.dll" | Where-Object {
-            $_.Name -like "orc-stage-plugin-skeleton-passthrough*.dll"
-          } | Select-Object -First 1
-          if (-not $candidate) {
-            Write-Host "DLL candidates under build/:"
-            Get-ChildItem -Path build -Recurse -File -Filter "*.dll" | ForEach-Object {
-              Write-Host " - $($_.FullName)"
-            }
-          }
-          if (-not $candidate) { throw 'Could not locate built plugin DLL' }
-          Copy-Item $candidate.FullName "dist/orc-plugin_skeleton_passthrough_windows.dll"
+          chmod +x scripts/merge_manifests.sh
+          ./scripts/merge_manifests.sh \
+            "${RUNNER_TEMP}/orc-plugin-manifest.yaml" \
+            dist/plugin-manifest-${{ matrix.platform }}.yaml
 
       - name: Upload packaged artifact
         uses: actions/upload-artifact@v4
@@ -144,12 +146,26 @@ jobs:
     needs: build-test-package
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout skeleton plugin
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
+      # Since host ABI 12 a release without a valid orc-plugin-manifest.yaml
+      # cannot be browsed, installed, or updated to, so the merge failing must
+      # fail the release rather than publish binaries nobody can use.
+      - name: Build release manifest
+        run: |
+          chmod +x scripts/merge_manifests.sh
+          ./scripts/merge_manifests.sh orc-plugin-manifest.yaml \
+            artifacts/*/plugin-manifest-*.yaml
+
       - name: Publish GitHub release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/orc-plugin_skeleton_passthrough_*
+          files: |
+            artifacts/**/orc-plugin_skeleton_passthrough_*
+            orc-plugin-manifest.yaml

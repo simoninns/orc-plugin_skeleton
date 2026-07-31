@@ -76,6 +76,26 @@ target_include_directories(${SKELETON_PLUGIN_TARGET} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+# Build-info emitter for the release manifest (host ABI 12 and later).
+# Compiled with the same toolchain and SDK headers as the plugin, it prints
+# the descriptor's ABI version and toolchain tag so scripts/package_local.sh
+# can declare them in orc-plugin-manifest.yaml without guessing.
+if(TARGET orc::plugin-sdk)
+    set(_orc_build_info_sdk_target orc::plugin-sdk)
+else()
+    set(_orc_build_info_sdk_target orc-plugin-sdk)
+endif()
+
+add_executable(orc-plugin-build-info tools/plugin_build_info.cpp)
+target_link_libraries(orc-plugin-build-info PRIVATE ${_orc_build_info_sdk_target})
+target_include_directories(orc-plugin-build-info PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_compile_definitions(orc-plugin-build-info PRIVATE
+    ORC_STAGE_PLUGIN_VERSION="${ORC_PLUGIN_VERSION}")
+set_target_properties(orc-plugin-build-info PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tools")
+
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)

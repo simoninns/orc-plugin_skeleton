@@ -48,17 +48,14 @@ inline constexpr uint32_t kStageMaxOutputs = 1;
 // Allowed: ALL, NTSC_ONLY, PAL_ONLY.
 inline constexpr orc::VideoFormatCompatibility kStageCompatibleFormats = VideoFormatCompatibility::ALL;
 
-// Sink grouping for presenter/UI organization.
-// Allowed: CORE, ANALYSIS, THIRD_PARTY.
-inline constexpr orc::SinkCategory kStageSinkCategory = SinkCategory::THIRD_PARTY;
-
-// UI menu category group shown in the node palette.
-// Allowed: any non-empty display string.
-inline constexpr const char* kStageMenuCategory = "Examples";
+// The Add Stage menu group is not declared here. Since host ABI 12 it is
+// derived from kStageNodeType by orc::stage_category_for() (SOURCE → Source,
+// TRANSFORM/MERGER/COMPLEX → Transform, ANALYSIS_SINK → Analysis, SINK →
+// Sink), so a plugin cannot place a stage under an invented category.
+inline constexpr orc::StageCategory kStageCategory = stage_category_for(kStageNodeType);
 
 static_assert(kStageName[0] != '\0', "kStageName must not be empty");
 static_assert(kStageDisplayName[0] != '\0', "kStageDisplayName must not be empty");
-static_assert(kStageMenuCategory[0] != '\0', "kStageMenuCategory must not be empty");
 
 static_assert(kStageMaxInputs >= kStageMinInputs, "kStageMaxInputs must be >= kStageMinInputs");
 static_assert(kStageMaxOutputs >= kStageMinOutputs, "kStageMaxOutputs must be >= kStageMinOutputs");

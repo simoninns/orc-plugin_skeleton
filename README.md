@@ -13,9 +13,10 @@ This repository is intended to be the canonical starter template for third-party
 - Example stage help text (`instructions.md`) wired into the host help dialog
 - Local smoke tests for stage metadata and entrypoint registration
 - Cross-platform CI workflow targets for Linux, macOS, and Windows
-- Release workflow that uploads platform plugin artifacts
+- Release workflow that uploads platform plugin artifacts together with the
+  mandatory `orc-plugin-manifest.yaml`
 
-## SDK Contract (Decode-Orc 2.x — host ABI 10 / plugin API 2)
+## SDK Contract (Decode-Orc 2.x — host ABI 12 / plugin API 4)
 
 - Include only the public SDK umbrella header in plugin/stage code:
 
@@ -38,6 +39,14 @@ This repository is intended to be the canonical starter template for third-party
 	fills in the host ABI version, plugin API version, and toolchain tag from
 	the SDK the plugin is compiled against. The host requires all three to
 	match exactly at load time; plugins built against a 1.x SDK are refused.
+
+- Declare stage metadata through `NodeTypeInfo`. Since host ABI 12 the Add
+	Stage menu group is **not** plugin-declared: `NodeTypeInfo` dropped its
+	`menu_category` and `sink_category` fields, and the category is derived from
+	the stage's `NodeType` by `orc::stage_category_for()` (SOURCE → Source,
+	TRANSFORM/MERGER/COMPLEX → Transform, ANALYSIS_SINK → Analysis, SINK →
+	Sink). `NodeTypeInfo::category()` reports the result; a stage can no longer
+	place itself under an invented category.
 
 ## Plugin Version Source
 
@@ -121,7 +130,7 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-5. Package local artifact:
+5. Package local artifact and its manifest fragment:
 
 ```bash
 ./scripts/package_local.sh build dist
@@ -129,19 +138,66 @@ ctest --test-dir build --output-on-failure
 
 ## Artifact Naming Contract
 
-Release assets and local packaging output follow:
+Release assets and local packaging output follow
+`orc-plugin_<stage-name>_<platform>[_abi<N>].<ext>`:
 
-- `orc-plugin_skeleton_passthrough_linux.so`
-- `orc-plugin_skeleton_passthrough_macos.dylib`
-- `orc-plugin_skeleton_passthrough_windows.dll`
+- `orc-plugin_skeleton_passthrough_linux_abi12.so`
+- `orc-plugin_skeleton_passthrough_macos_abi12.dylib`
+- `orc-plugin_skeleton_passthrough_windows_abi12.dll`
 
-This aligns with Decode-Orc host registry/import expectations from Phase 7C/7D.
+The `_abi<N>` token records the host ABI the binary targets, so one release can
+carry builds for several host ABIs side by side. The host validates downloads
+against this pattern, but it no longer *selects* by name — that is the release
+manifest's job (below). `package_local.sh` takes the ABI number from the built
+descriptor, so the name always matches the binary.
+
+## Release Manifest (required)
+
+Since host ABI 12 every release must publish an `orc-plugin-manifest.yaml`
+asset alongside its binaries. A release without one — or with an invalid one —
+cannot be browsed, installed, or updated to: the host resolves which artifact
+to install entirely from the manifest, and refuses anything whose declared ABI
+or toolchain tag cannot work.
+
+```yaml
+manifest_schema: 1
+plugin_id: org.decodeorc.stage.skeleton_passthrough
+plugin_version: 1.0.0
+artifacts:
+  - file: orc-plugin_skeleton_passthrough_linux_abi12.so
+    platform: linux
+    abi: 12
+    toolchain_tag: gcc15/libstdc++
+    sha256: 5854e982866bf2d3c8211c9f34af3d5686a66036953aaf026bef33b0d5a80b7b
+```
+
+This repository generates it rather than hand-maintaining it, because the ABI
+number and toolchain tag are properties of the compiler that produced each
+binary:
+
+- `tools/plugin_build_info.cpp` builds into `orc-plugin-build-info`, compiled
+	with the same toolchain and SDK headers as the plugin, and prints the
+	descriptor's own `plugin_id`, `plugin_version`, `abi` and `toolchain_tag`.
+- `scripts/package_local.sh` reads those values, names and copies the release
+	asset, digests it, and writes `dist/plugin-manifest-<platform>.yaml` — a
+	complete, valid single-platform manifest.
+- `scripts/merge_manifests.sh` combines the per-platform fragments into the
+	single `orc-plugin-manifest.yaml` published with the release, failing if the
+	fragments disagree about the plugin identity or declare no artifacts.
+
+The manifest is a declaration by CI, not proof — the load-time ABI/toolchain
+gate remains the enforcement point. Its purpose is to give the plugin browser a
+definitive compatibility verdict before anything is downloaded, and to supply
+the digest used to verify (and quarantine) downloads and cache hits.
 
 ## CI and Release
 
 - Unified workflow: `.github/workflows/ci.yml`
 	- on push/PR: builds/tests/packages on Linux and macOS via Nix (`nix develop`), plus native Windows build; uploads CI artifacts
-	- on tag push (`v*`): runs the exact same build/test/package matrix, then publishes those artifacts to GitHub Release assets
+	- on tag push (`v*`): runs the exact same build/test/package matrix, merges the per-platform manifest fragments, then publishes the artifacts and `orc-plugin-manifest.yaml` to GitHub Release assets
+- `ORC_SDK_REF` in the workflow pins the decode-orc checkout the SDK comes
+	from. It normally tracks `main`; it is currently pinned to the ABI 12 branch
+	`20260729-001` and should return to `main` once that branch merges.
 
 ## Tagging a Release
 
@@ -160,8 +216,9 @@ git push origin v1.0.0
 
 This triggers the release workflow, which:
 1. Builds and tests across Linux, macOS, and Windows
-2. Packages platform-specific artifacts
-3. Creates a GitHub Release with the tagged artifacts attached
+2. Packages platform-specific artifacts and their manifest fragments
+3. Merges the fragments into `orc-plugin-manifest.yaml`
+4. Creates a GitHub Release with the tagged artifacts and the manifest attached
 
 ## License
 

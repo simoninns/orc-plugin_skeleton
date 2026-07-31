@@ -20,7 +20,7 @@ NodeTypeInfo SkeletonPassthroughStage::get_node_type_info() const
     return NodeTypeInfo{
         NodeType::TRANSFORM, "skeleton_passthrough", "Skeleton Passthrough",
         "Minimal external plugin stage that forwards one input artifact.",
-        1, 1, 1, 1, VideoFormatCompatibility::ALL, SinkCategory::THIRD_PARTY, "Examples"
+        1, 1, 1, 1, VideoFormatCompatibility::ALL
     };
 }
 

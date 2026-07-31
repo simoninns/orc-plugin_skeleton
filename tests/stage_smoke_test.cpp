@@ -17,6 +17,13 @@ int main()
         return 1;
     }
 
+    // ABI 12: the Add Stage menu category is derived from the node type by
+    // the SDK, never declared by the plugin.
+    if (info.category() != orc::StageCategory::TRANSFORM) {
+        std::cerr << "Expected the derived stage category to be Transform\n";
+        return 1;
+    }
+
     if (stage.required_input_count() != 1 || stage.output_count() != 1) {
         std::cerr << "Expected one input and one output\n";
         return 1;
