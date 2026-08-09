@@ -2,7 +2,7 @@
   description = "Decode-Orc skeleton stage plugin";
 
   # Keep the nixpkgs input aligned with the decode-orc host repository's
-  # flake (github:simoninns/decode-orc). Since Decode-Orc 2.0 (host ABI 5+)
+  # flake (github:decode-orc/decode-orc). Since Decode-Orc 2.0 (host ABI 5+)
   # the plugin loader requires the plugin's toolchain tag — compiler family,
   # major version, and C++ standard library — to equal the host's exactly.
   # Building from a different nixpkgs generation (and therefore a different

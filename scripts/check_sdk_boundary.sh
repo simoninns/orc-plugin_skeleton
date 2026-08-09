@@ -30,7 +30,7 @@ say "[sdk-boundary] Scanning for private decode-orc include usage..."
 include_hits="$(run_search '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<\"](orc/core/|.*/orc/core/)' "${include_scan_paths[@]}")"
 if [[ -n "$include_hits" ]]; then
   say "$include_hits"
-  say "[sdk-boundary] ERROR: Private host/core include path detected. Use only SDK headers under orc/sdk/include/orc/plugin/."
+  say "[sdk-boundary] ERROR: Private host/core include path detected. Use only SDK headers under orc/sdk/include (orc/abi/, orc/plugin/, orc/stage/, orc/support/)."
   fail=1
 fi
 

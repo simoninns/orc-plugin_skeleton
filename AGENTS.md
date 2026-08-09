@@ -4,8 +4,8 @@ Use these instructions for all changes in this repository.
 
 ## Source of Truth
 - Follow the latest decode-orc patterns from main:
-  - https://github.com/simoninns/decode-orc/tree/main/orc/plugins
-  - https://github.com/simoninns/decode-orc/tree/main/orc/plugins/stages
+  - https://github.com/decode-orc/decode-orc/tree/main/orc/plugins
+  - https://github.com/decode-orc/decode-orc/tree/main/orc/plugins/stages
 - For SDK usage and ABI contracts, use only public SDK headers under the
   tiered SDK layout:
   - `orc/sdk/include/orc/abi/` (frozen binary contract: descriptor,
@@ -30,6 +30,13 @@ Use these instructions for all changes in this repository.
   `menu_category` or `sink_category`; the Add Stage group is derived from
   `NodeType` by `orc::stage_category_for()` and read back via
   `NodeTypeInfo::category()`.
+- Do not reach for format-specific analysis result types. Host ABI 13 removed
+  the teletext types from `<orc/stage/analysis_sink_results.h>` (which now
+  carries only the dropout, SNR and burst-level interfaces) and the
+  `orc/support/{teletext_*,nabts_page}.h` decoders left the SDK with them. A
+  stage that wants to hand the host a browsable set of items implements
+  `ICatalogueResults` from `<orc/stage/tooling/catalogue_results.h>` and
+  declares `StageToolKind::CatalogueBrowser`.
 
 ## Release Manifest Rules
 - Every release must publish `orc-plugin-manifest.yaml` (host ABI 12 and
@@ -57,8 +64,9 @@ Use these instructions for all changes in this repository.
 - Keep workflow SDK checkout pointed at decode-orc main by default.
 - Do not pin `ORC_SDK_REF` to ephemeral or unknown refs.
 - If pinning is required, use an existing branch/tag/commit and update references in the workflow intentionally.
-- `ORC_SDK_REF` is currently pinned to `20260729-001` (host ABI 12 and the
-  mandatory release manifest); return it to `main` once that branch merges.
+- `ORC_SDK_REF` currently tracks `main` (host ABI 13). Pin it only for a
+  deliberate, temporary reason, and return it to `main` once that branch
+  merges.
 - Preserve cross-platform matrix behavior (Linux/macOS/Windows) and packaging outputs.
 - Preserve artifact names and expected output paths unless a coordinated CI change is made.
 - Release assets and the release manifest are published together; a change to

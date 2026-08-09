@@ -16,7 +16,7 @@ This repository is intended to be the canonical starter template for third-party
 - Release workflow that uploads platform plugin artifacts together with the
   mandatory `orc-plugin-manifest.yaml`
 
-## SDK Contract (Decode-Orc 2.x — host ABI 12 / plugin API 4)
+## SDK Contract (Decode-Orc 2.x — host ABI 13 / plugin API 4)
 
 - Include only the public SDK umbrella header in plugin/stage code:
 
@@ -47,6 +47,17 @@ This repository is intended to be the canonical starter template for third-party
 	TRANSFORM/MERGER/COMPLEX → Transform, ANALYSIS_SINK → Analysis, SINK →
 	Sink). `NodeTypeInfo::category()` reports the result; a stage can no longer
 	place itself under an invented category.
+
+- Keep format-specific result types out of the plugin contract. Host ABI 13
+	removed the teletext types from `<orc/stage/analysis_sink_results.h>`, which
+	now carries only `IDropoutAnalysisResults`, `ISNRAnalysisResults` and
+	`IBurstLevelAnalysisResults`; the `orc/support/{teletext_*,nabts_page}.h`
+	decoders left the SDK with them. A stage that wants to hand the host a
+	browsable set of items — a character-cell grid, a 2D display list, a text
+	document or a table — implements `ICatalogueResults` from
+	`<orc/stage/tooling/catalogue_results.h>` and declares the appended
+	`StageToolKind::CatalogueBrowser`. This skeleton is a plain transform and
+	uses neither.
 
 ## Plugin Version Source
 
@@ -143,9 +154,9 @@ ctest --test-dir build --output-on-failure
 Release assets and local packaging output follow
 `orc-plugin_<stage-name>_<platform>[_abi<N>].<ext>`:
 
-- `orc-plugin_skeleton_passthrough_linux_abi12.so`
-- `orc-plugin_skeleton_passthrough_macos_abi12.dylib`
-- `orc-plugin_skeleton_passthrough_windows_abi12.dll`
+- `orc-plugin_skeleton_passthrough_linux_abi13.so`
+- `orc-plugin_skeleton_passthrough_macos_abi13.dylib`
+- `orc-plugin_skeleton_passthrough_windows_abi13.dll`
 
 The `_abi<N>` token records the host ABI the binary targets, so one release can
 carry builds for several host ABIs side by side. The host validates downloads
@@ -164,11 +175,11 @@ or toolchain tag cannot work.
 ```yaml
 manifest_schema: 1
 plugin_id: org.decodeorc.stage.skeleton_passthrough
-plugin_version: 1.0.0
+plugin_version: 1.0.9
 artifacts:
-  - file: orc-plugin_skeleton_passthrough_linux_abi12.so
+  - file: orc-plugin_skeleton_passthrough_linux_abi13.so
     platform: linux
-    abi: 12
+    abi: 13
     toolchain_tag: gcc15/libstdc++
     sha256: 5854e982866bf2d3c8211c9f34af3d5686a66036953aaf026bef33b0d5a80b7b
 ```
@@ -197,9 +208,10 @@ the digest used to verify (and quarantine) downloads and cache hits.
 - Unified workflow: `.github/workflows/ci.yml`
 	- on push/PR: builds/tests/packages on Linux and macOS via Nix (`nix develop`), plus native Windows build; uploads CI artifacts
 	- on tag push (`v*`): runs the exact same build/test/package matrix, merges the per-platform manifest fragments, then publishes the artifacts and `orc-plugin-manifest.yaml` to GitHub Release assets
-- `ORC_SDK_REF` in the workflow pins the decode-orc checkout the SDK comes
-	from. It normally tracks `main`; it is currently pinned to the ABI 12 branch
-	`20260729-001` and should return to `main` once that branch merges.
+- `ORC_SDK_REF` in the workflow selects the decode-orc checkout the SDK comes
+	from. It tracks `main` (host ABI 13); pin it to a branch or tag only for a
+	deliberate, temporary reason, and return it to `main` once that branch
+	merges.
 
 ## Tagging a Release
 

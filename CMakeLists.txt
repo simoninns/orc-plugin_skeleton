@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(orc-plugin-skeleton
-    VERSION 1.0.8
+    VERSION 1.0.9
     DESCRIPTION "Decode-Orc external plugin skeleton"
     LANGUAGES CXX
 )

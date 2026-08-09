@@ -15,10 +15,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ORC_SDK_DIR: ${{ github.workspace }}/decode-orc
-      # Host SDK the plugin is built against. Normally `main`; pinned to
-      # 20260729-001 (host ABI 12 / mandatory release manifest) until that
-      # branch merges, then restore `main`.
-      ORC_SDK_REF: 20260729-001
+      # Host SDK the plugin is built against. Tracks `main` (host ABI 13).
+      # Pin to a branch or tag only for a deliberate, temporary reason, and
+      # restore `main` once it merges.
+      ORC_SDK_REF: main
       ORC_CMAKE_ARGS: -DORC_INTREE_SDK_DIR=${{ github.workspace }}/decode-orc -DBUILD_TESTS=ON
     strategy:
       fail-fast: false
@@ -44,7 +44,7 @@ jobs:
       - name: Checkout decode-orc host repository
         uses: actions/checkout@v4
         with:
-          repository: simoninns/decode-orc
+          repository: decode-orc/decode-orc
           ref: ${{ env.ORC_SDK_REF }}
           path: decode-orc
 
